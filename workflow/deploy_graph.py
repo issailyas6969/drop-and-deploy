@@ -139,7 +139,7 @@ def deploy(state: DeployState) -> DeployState:
 
         # Upload artifact via SFTP
         sftp = ssh.open_sftp()
-        remote_artifact = f"/tmp/{os.path.basename(artifact)}"
+        remote_artifact =f"/tmp/remote_{os.path.basename(artifact)}"
         logs.append(f"📤 [deploy] Uploading artifact to {remote_artifact}...")
         sftp.put(artifact, remote_artifact)
         sftp.close()
