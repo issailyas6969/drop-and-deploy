@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Drop & Deploy</title>
+<style>
+  :root {
+    --bg: #0b0d10;
+    --panel: #14181d;
+    --panel-raised: #181d23;
+    --line: #2a3138;
+    --line-soft: #1f252b;
+    --text: #e7eaec;
+    --text-dim: #9aa4ad;
+    --text-faint: #5e6770;
+    --signal: #ff6b4a;
+    --signal-dim: #3a2420;
+    --phosphor: #7ee787;
+    --phosphor-dim: #16261a;
+    --mono: 'IBM Plex Mono', 'SF Mono', Menlo, monospace;
+    --sans: 'Inter', -apple-system, sans-serif;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--bg);
+    background-image:
+      radial-gradient(circle at 15% 0%, rgba(255,107,74,0.05), transparent 45%),
+      radial-gradient(circle at 85% 100%, rgba(126,231,135,0.04), transparent 45%);
+    color: var(--text);
+    font-family: var(--sans);
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+  }
+
+  .card {
+    width: 100%;
+    max-width: 560px;
+  }
+
+  .eyebrow {
+    font-family: var(--mono);
+    font-size: 12px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--text-faint);
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .eyebrow::before {
+    content: '';
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: var(--text-faint);
+    display: inline-block;
+  }
+
+  h1 {
+    font-size: 38px;
+    line-height: 1.08;
+    margin: 0 0 8px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    color: var(--text);
+  }
+
+  .sub {
+    color: var(--text-dim);
+    font-size: 15px;
+    margin: 0 0 36px;
+    max-width: 44ch;
+    line-height: 1.5;
+  }
+
+  .dropzone {
+    border: 1.5px dashed var(--line);
+    border-radius: 6px;
+    padding: 48px 24px;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color 0.15s ease, background 0.15s ease;
+    background: var(--panel);
+    position: relative;
+    display: block;
+  }
+
+  .dropzone:hover,
+  .dropzone.drag {
+    border-color: var(--signal);
+    background: var(--signal-dim);
+  }
+
+  .dropzone input { display: none; }
+
+  .dz-icon {
+    font-family: var(--mono);
+    font-size: 13px;
+    color: var(--signal);
+    margin-bottom: 14px;
+    display: inline-block;
+    border: 1px solid currentColor;
+    padding: 3px 8px;
+    border-radius: 3px;
+  }
+
+  .dz-text { font-size: 15px; font-weight: 500; color: var(--text); }
+  .dz-sub { font-size: 13px; color: var(--text-faint); margin-top: 6px; }
+
+  .filename {
+    font-family: var(--mono);
+    font-size: 14px;
+    margin-top: 14px;
+    color: var(--phosphor);
+  }
+
+  button.deploy {
+    width: 100%;
+    margin-top: 20px;
+    padding: 16px;
+    background: var(--signal);
+    color: #1a0f0a;
+    border: none;
+    border-radius: 6px;
+    font-family: var(--mono);
+    font-size: 14px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    cursor: pointer;
+    transition: background 0.15s ease, transform 0.1s ease;
+  }
+
+  button.deploy:disabled {
+    background: var(--line);
+    color: var(--text-faint);
+    cursor: not-allowed;
+  }
+
+  button.deploy:not(:disabled):hover { background: #ff7d5e; }
+  button.deploy:not(:disabled):active { transform: scale(0.99); }
+
+  .log {
+    margin-top: 24px;
+    font-family: var(--mono);
+    font-size: 13px;
+    line-height: 1.6;
+    background: #07090b;
+    color: var(--phosphor);
+    border: 1px solid var(--line-soft);
+    border-radius: 6px;
+    padding: 16px;
+    white-space: pre-wrap;
+    max-height: 280px;
+    overflow-y: auto;
+    display: none;
+    box-shadow: inset 0 0 24px rgba(126,231,135,0.03);
+  }
+
+  .log.show { display: block; }
+  .log .err { color: var(--signal); }
+  .log .ok { color: var(--phosphor); }
+
+  .status-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    font-family: var(--mono);
+    font-size: 12px;
+    margin-top: 16px;
+    color: var(--text-dim);
+  }
+
+  .dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--text-faint);
+    transition: background 0.15s ease, box-shadow 0.15s ease;
+  }
+  .dot.live {
+    background: var(--phosphor);
+    box-shadow: 0 0 6px rgba(126,231,135,0.6);
+  }
+  .dot.error {
+    background: var(--signal);
+    box-shadow: 0 0 6px rgba(255,107,74,0.6);
+  }
+
+  .apps-section { margin-top: 8px; }
+
+  .apps-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .app-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 14px;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    font-family: var(--mono);
+    font-size: 13px;
+  }
+
+  .app-row .app-name {
+    font-weight: 600;
+    color: var(--text);
+  }
+
+  .app-row .app-file {
+    color: var(--text-faint);
+    font-size: 12px;
+    margin-left: 8px;
+  }
+
+  .app-row a {
+    color: var(--phosphor);
+    text-decoration: none;
+    font-size: 12px;
+    border: 1px solid var(--phosphor-dim);
+    background: var(--phosphor-dim);
+    padding: 4px 10px;
+    border-radius: 4px;
+    transition: background 0.15s ease, color 0.15s ease;
+  }
+
+  .app-row a:hover {
+    background: var(--phosphor);
+    color: #07140a;
+  }
+
+  ::-webkit-scrollbar { width: 8px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--line); border-radius: 4px; }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { transition: none !important; }
+  }
+</style>
+</head>
+<body>
+
+<div class="card">
+  <div class="eyebrow">app.py → ec2</div>
+  <h1>Drop your file in. We'll run it.</h1>
+  <p class="sub">Upload a single Flask or FastAPI file. We ship it to your server and start it — no terminal required.</p>
+
+  <form id="form">
+    <label class="dropzone" id="dropzone">
+      <input type="file" id="fileInput" accept=".py" />
+      <span class="dz-icon">.py</span>
+      <div class="dz-text">Click to choose a file, or drag it here</div>
+      <div class="dz-sub">Single Python file only</div>
+      <div class="filename" id="filename"></div>
+    </label>
+
+    <button type="submit" class="deploy" id="deployBtn" disabled>Deploy app.py</button>
+  </form>
+
+  <div class="status-pill" id="statusPill">
+    <span class="dot" id="statusDot"></span>
+    <span id="statusText">Waiting for a file</span>
+  </div>
+
+  <div class="log" id="log"></div>
+
+  <div class="apps-section" id="appsSection" style="display:none;">
+    <div class="eyebrow" style="margin-top:40px;">deployed</div>
+    <div class="apps-list" id="appsList"></div>
+  </div>
+</div>
+
+<script>
+const dropzone = document.getElementById('dropzone');
+const fileInput = document.getElementById('fileInput');
+const filenameEl = document.getElementById('filename');
+const deployBtn = document.getElementById('deployBtn');
+const form = document.getElementById('form');
+const logEl = document.getElementById('log');
+const statusDot = document.getElementById('statusDot');
+const statusText = document.getElementById('statusText');
+
+let selectedFile = null;
+
+function setFile(file) {
+  if (!file) return;
+  if (!file.name.endsWith('.py')) {
+    statusText.textContent = 'Only .py files are accepted';
+    statusDot.className = 'dot error';
+    return;
+  }
+  selectedFile = file;
+  filenameEl.textContent = file.name;
+  deployBtn.disabled = false;
+  deployBtn.textContent = `Deploy ${file.name}`;
+  statusText.textContent = 'Ready to deploy';
+  statusDot.className = 'dot';
+}
+
+const appsSection = document.getElementById('appsSection');
+const appsList = document.getElementById('appsList');
+
+function appUrl(port) {
+  return `http://${window.location.hostname}:${port}`;
+}
+
+async function loadApps() {
+  try {
+    const res = await fetch('/apps');
+    const data = await res.json();
+    const apps = data.apps || [];
+
+    if (apps.length === 0) {
+      appsSection.style.display = 'none';
+      return;
+    }
+
+    appsSection.style.display = 'block';
+    appsList.innerHTML = apps.map(a => `
+      <div class="app-row">
+        <div>
+          <span class="app-name">${a.name}</span>
+          <span class="app-file">${a.filename} · :${a.port}</span>
+        </div>
+        <a href="${appUrl(a.port)}" target="_blank" rel="noopener">Open ↗</a>
+      </div>
+    `).join('');
+  } catch (err) {
+    // Quietly ignore — apps list is a nice-to-have, not critical
+  }
+}
+
+loadApps();
+
+dropzone.addEventListener('click', () => fileInput.click());
+fileInput.addEventListener('change', (e) => setFile(e.target.files[0]));
+
+['dragover', 'dragenter'].forEach(evt =>
+  dropzone.addEventListener(evt, (e) => { e.preventDefault(); dropzone.classList.add('drag'); })
+);
+['dragleave', 'drop'].forEach(evt =>
+  dropzone.addEventListener(evt, (e) => { e.preventDefault(); dropzone.classList.remove('drag'); })
+);
+dropzone.addEventListener('drop', (e) => {
+  const file = e.dataTransfer.files[0];
+  setFile(file);
+});
+
+form.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  if (!selectedFile) return;
+
+  deployBtn.disabled = true;
+  deployBtn.textContent = `Deploying ${selectedFile.name}…`;
+  logEl.classList.add('show');
+  logEl.textContent = '';
+  statusDot.className = 'dot live';
+  statusText.textContent = 'Deploying';
+
+  const formData = new FormData();
+  formData.append('file', selectedFile);
+
+  try {
+    const res = await fetch('/deploy', { method: 'POST', body: formData });
+    const data = await res.json();
+
+    logEl.textContent = data.log || '';
+    if (data.success) {
+      statusText.textContent = `Live on port ${data.port}`;
+      statusDot.className = 'dot live';
+      deployBtn.textContent = 'Deploy another app';
+      deployBtn.disabled = false;
+      selectedFile = null;
+      filenameEl.textContent = '';
+      fileInput.value = '';
+      loadApps();
+    } else {
+      statusText.textContent = 'Deploy failed';
+      statusDot.className = 'dot error';
+      deployBtn.textContent = 'Retry deploy';
+      deployBtn.disabled = false;
+    }
+  } catch (err) {
+    logEl.textContent = 'Error: ' + err.message;
+    statusText.textContent = 'Connection failed';
+    statusDot.className = 'dot error';
+    deployBtn.textContent = 'Retry deploy';
+    deployBtn.disabled = false;
+  }
+});
+</script>
+
+</body>
+</html>
